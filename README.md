@@ -1,6 +1,6 @@
 # SteamNetLobby
-ue4 steam net lobby 
-
+适用于UE的网络大厅,附带示例代码;可以直接使用;
+所有节点有完整的注释说明;
 
 
 # the steam config settings
@@ -28,3 +28,12 @@ bAllowP2PPacketRelay=true
 P2PConnectionTimeout=90
 ```
 
+# 节点功能图
+![01](./res/node_01.png)
+![02](./res/node_02.png)
+![03](./res/node_03.png)
+
+
+
+# 示例代码流程图
+![example](./res/example.png)

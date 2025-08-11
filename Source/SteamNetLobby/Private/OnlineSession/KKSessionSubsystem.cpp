@@ -5,7 +5,10 @@
 #include "OnlineSubsystemUtils.h"
 #include "OnlineSessionSettings.h"
 
+#include "Interfaces/OnlineSessionInterface.h"
 
+#include "Online/OnlineSessionNames.h"
+#include "Online/CoreOnline.h"
 
 // 创建Session
 void UKKSessionSubsystem::KKCreateSession(APlayerController* PlayerController,FKKSessionSettings Settings,TMap<FName,FString> CustomData,FKKSessionOneParam OnCreateSessionFinish)
@@ -76,7 +79,7 @@ void UKKSessionSubsystem::KKFindSession(APlayerController* PlayerController,bool
 	check(OnlineSessionPtr.IsValid() != false)
 	
 	OnlineSessionPtr->OnFindSessionsCompleteDelegates.Clear();
-	OnlineSessionPtr->OnFindSessionsCompleteDelegates.AddLambda([OnFindSessionFinish,OnlineSessionPtr,this](bool bSuccess)
+	OnlineSessionPtr->OnFindSessionsCompleteDelegates.AddLambda([OnFindSessionFinish,this](bool bSuccess)
 	{
 		TArray<FKKSessionInfo> FindSessionInfo;
 		for (int i = 0; i <  OnlineSessionSearch->SearchResults.Num() ; ++i)
@@ -94,7 +97,7 @@ void UKKSessionSubsystem::KKFindSession(APlayerController* PlayerController,bool
 	OnlineSessionSearch->MaxSearchResults = 999;
 	OnlineSessionSearch->bIsLanQuery = bIsLAN;
 
-	OnlineSessionSearch->QuerySettings.Set(SEARCH_PRESENCE,true,EOnlineComparisonOp::Equals);
+	OnlineSessionSearch->QuerySettings.Set(SEARCH_LOBBIES,true,EOnlineComparisonOp::Equals);
 	
 	OnlineSessionPtr->FindSessions(0,OnlineSessionSearch.ToSharedRef());
 }
@@ -108,13 +111,19 @@ void UKKSessionSubsystem::KKJoinSession(APlayerController* PlayerController, int
 	check(OnlineSessionPtr.IsValid() != false)
 
 	OnlineSessionPtr->OnJoinSessionCompleteDelegates.Clear();
-	OnlineSessionPtr->OnJoinSessionCompleteDelegates.AddLambda([PlayerController,OnlineSessionPtr](FName SessionName, EOnJoinSessionCompleteResult::Type Type)
+	OnlineSessionPtr->OnJoinSessionCompleteDelegates.AddLambda([PCPtr = TWeakObjectPtr<APlayerController>(PlayerController),WeakOnlineSessionPtr = OnlineSessionPtr.ToWeakPtr()](FName SessionName, EOnJoinSessionCompleteResult::Type Type)
 	{
-		if (Type == EOnJoinSessionCompleteResult::Success)
+		if (!WeakOnlineSessionPtr.IsValid())
+		{
+			return;
+		}
+		auto OnlineSessionPtr = WeakOnlineSessionPtr.Pin();
+		
+		if (Type == EOnJoinSessionCompleteResult::Success && PCPtr.IsValid())
 		{
 			FString URL;
 			OnlineSessionPtr->GetResolvedConnectString(NAME_GameSession,URL);
-			PlayerController->ClientTravel(URL,ETravelType::TRAVEL_Absolute);
+			PCPtr->ClientTravel(URL,ETravelType::TRAVEL_Absolute);
 		}
 	});
 
@@ -170,7 +179,7 @@ void UKKSessionSubsystem::KKDestorySession(APlayerController* PlayerController)
 
 	OnlineSessionPtr->DestroySession(NAME_GameSession,FOnDestroySessionCompleteDelegate::CreateLambda([](FName SessionName,bool bSuccess)
 	{
-		
+		UE_LOG(LogTemp,Warning, TEXT("KKDestorySession: SessionName:[%s] | result:[%d]"),*SessionName.ToString(),bSuccess);
 	}));
 }
 
@@ -213,14 +222,18 @@ void UKKSessionSubsystem::KKGetFriendsList(APlayerController* PlayerController,F
 	check(OnlineFriendsPtr.IsValid() != false)
 	FString FriendsList;
 	OnlineFriendsPtr->ReadFriendsList(0,FriendsList,FOnReadFriendsListComplete::CreateLambda(
-		[OnlineFriendsPtr,OnGetFriendsList](int32 LocalUserNum, bool bWasSuccessful, const FString& ListName, const FString& ErrorStr)
+		[WeakFriendsPtr = OnlineFriendsPtr.ToWeakPtr(),OnGetFriendsList](int32 LocalUserNum, bool bWasSuccessful, const FString& ListName, const FString& ErrorStr)
 		{
+			if (!WeakFriendsPtr.IsValid())
+			{
+				return;
+			}
 			UE_LOG(LogTemp,Warning,TEXT("Read Friends List : %s"),bWasSuccessful?TEXT("Success"):TEXT("failed"));
 			if (bWasSuccessful)
 			{
 				UE_LOG(LogTemp,Warning,TEXT("firends list : %s"),*ListName);
 				TArray<TSharedRef<FOnlineFriend>> Find_Friends;
-				OnlineFriendsPtr->GetFriendsList(LocalUserNum,ListName,Find_Friends);
+				WeakFriendsPtr.Pin()->GetFriendsList(LocalUserNum,ListName,Find_Friends);
 
 				TArray<FKKFriendInfo> Tmp;
 				for (TSharedRef<FOnlineFriend> it : Find_Friends)
@@ -263,23 +276,26 @@ void UKKSessionSubsystem::KKBindInviteDelegate(APlayerController* PlayerControll
 	IOnlineSessionPtr OnlineSessionPtr = Subsystem->GetSessionInterface();
 	check(OnlineSessionPtr.IsValid() != false)
 	OnlineSessionPtr->OnSessionUserInviteAcceptedDelegates.Clear();
-	OnlineSessionPtr->OnSessionUserInviteAcceptedDelegates.AddLambda([OnlineSessionPtr,PlayerController](
+	OnlineSessionPtr->OnSessionUserInviteAcceptedDelegates.AddLambda([WeakOnlineSessionPtr = OnlineSessionPtr.ToWeakPtr(),WeakPlayerController = TWeakObjectPtr<APlayerController>(PlayerController)](
 		const bool bWasSuccessful, const int32 ControllerId,
 		TSharedPtr<const FUniqueNetId> UserId, const FOnlineSessionSearchResult& InviteResult)
 	{
-
-		OnlineSessionPtr->OnJoinSessionCompleteDelegates.Clear();
-		OnlineSessionPtr->OnJoinSessionCompleteDelegates.AddLambda([OnlineSessionPtr,PlayerController](FName SessionName, EOnJoinSessionCompleteResult::Type Type)
+		if (!WeakOnlineSessionPtr.IsValid() || !WeakPlayerController.IsValid())
+		{
+			return;
+		}
+		WeakOnlineSessionPtr.Pin()->OnJoinSessionCompleteDelegates.Clear();
+		WeakOnlineSessionPtr.Pin()->OnJoinSessionCompleteDelegates.AddLambda([WeakOnlineSessionPtr,WeakPlayerController](FName SessionName, EOnJoinSessionCompleteResult::Type Type)
 		{
 			if (Type == EOnJoinSessionCompleteResult::Success)
 			{
 				FString URL;
-				OnlineSessionPtr->GetResolvedConnectString(NAME_GameSession,URL);
-				PlayerController->ClientTravel(URL,ETravelType::TRAVEL_Absolute);
+				WeakOnlineSessionPtr.Pin()->GetResolvedConnectString(NAME_GameSession,URL);
+				WeakPlayerController.Pin()->ClientTravel(URL,ETravelType::TRAVEL_Absolute);
 			}
 		});
 		UE_LOG(LogTemp,Warning,TEXT("********* OnSessionUserInviteAcceptedDelegates **********"));
-		bool ret = OnlineSessionPtr->JoinSession(0,NAME_GameSession,InviteResult);
+		bool ret = WeakOnlineSessionPtr.Pin()->JoinSession(0,NAME_GameSession,InviteResult);
 		UE_LOG(LogTemp,Warning,TEXT("join Invite session : %s"),ret?TEXT("Success"):TEXT("Failed"));
 	});
 
@@ -320,4 +336,14 @@ void UKKSessionSubsystem::KKServerTravel(APlayerController * PlayerController,co
 	const FString LevelName(*FPackageName::ObjectPathToPackageName(Level.ToString()));
 	UE_LOG(LogTemp,Warning,TEXT("Travel URL : %s"),*LevelName);
 	PlayerController->GetWorld()->ServerTravel(LevelName,bAbsolute,bSkipGameNotify);
+}
+
+void UKKSessionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+{
+	Super::Initialize(Collection);
+}
+
+void UKKSessionSubsystem::Deinitialize()
+{
+	Super::Deinitialize();
 }

@@ -42,7 +42,8 @@ public class SteamNetLobby : ModuleRules
 				"OnlineSubsystem",
 				// "OnlineSubsystemSteam",
 				"OnlineSubsystemUtils",
-				"OnlineSubsystemNull"
+				"OnlineSubsystemNull",
+				"CoreOnline"
 			}
 			);
 		

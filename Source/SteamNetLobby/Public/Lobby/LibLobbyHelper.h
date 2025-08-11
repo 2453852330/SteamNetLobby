@@ -16,12 +16,15 @@ class STEAMNETLOBBY_API ULibLobbyHelper : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintCallable)
+	// 更新玩家的准备状态
+	UFUNCTION(BlueprintCallable,Category="KKSession")
 	static void LibUpdatePlayerReadyState(UPARAM(ref) TArray<FLobbyPlayerInfo> & PlayerList,FText PlayerName);
 
-	UFUNCTION(BlueprintCallable)
+	// 通过玩家名称踢出玩家
+	UFUNCTION(BlueprintCallable,Category="KKSession")
 	static void LibRemovePlayerByName(UPARAM(ref) TArray<FLobbyPlayerInfo> & PlayerList,FText PlayerName);
 
-	UFUNCTION(BlueprintCallable)
+	// 服务器关卡切换
+	UFUNCTION(BlueprintCallable,Category="KKSession")
 	static void LibServerTravel(APlayerController * PlayerController,const TSoftObjectPtr<UWorld> Level);
 };

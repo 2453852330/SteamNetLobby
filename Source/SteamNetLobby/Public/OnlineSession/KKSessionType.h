@@ -2,7 +2,7 @@
 #include "OnlineSubsystemTypes.h"
 #include "KKSessionType.generated.h"
 
-USTRUCT(BlueprintType)
+USTRUCT(BlueprintType,Category="KKSession")
 struct FKKSessionSettings
 {
 	GENERATED_USTRUCT_BODY()
@@ -17,7 +17,7 @@ struct FKKSessionSettings
 	FKKSessionSettings():PublicNum(4),PrivateNum(0),bIsLAN(true){}
 };
 
-USTRUCT(BlueprintType)
+USTRUCT(BlueprintType,Category="KKSession")
 struct FKKSessionInfo
 {
 	GENERATED_USTRUCT_BODY()
@@ -34,7 +34,7 @@ struct FKKSessionInfo
 
 
 
-USTRUCT(BlueprintType)
+USTRUCT(BlueprintType,Category="KKSession")
 struct FKKFriendInfo
 {
 	GENERATED_USTRUCT_BODY()
